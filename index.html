@@ -155,6 +155,38 @@
     .mstate.open i{animation:none}
     .statusline svg{transition:none}
   }
+
+  /* ---------- TV / single 16:9 screen ---------- */
+  @media (min-width:1000px) and (min-aspect-ratio:7/5){
+    html,body{height:100%;overflow:hidden}
+    .wrap{
+      height:100svh;max-width:none;
+      display:grid;
+      grid-template-columns:minmax(380px,42fr) 58fr;
+      grid-template-rows:auto minmax(0,1fr) auto auto;
+      grid-template-areas:"top top" "hero chart" "stats stats" "foot foot";
+      column-gap:clamp(24px,3.5vw,70px);
+      padding:0 clamp(24px,3.5vw,64px);
+    }
+    .topbar{grid-area:top;padding:2.4vh 0 1vh}
+    #err{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:50;margin:0;background:var(--void)}
+    .hero{grid-area:hero;align-self:center;padding:0}
+    .pricerow{flex-direction:column;align-items:flex-start;gap:2.4vh}
+    .price{font-size:min(17vh,7.2vw)}
+    .deltas{flex-direction:row;gap:12px;padding-bottom:0;flex-wrap:wrap}
+    .pill{font-size:clamp(14px,1.9vh,22px)}
+    .statusline{margin-top:3.4vh;font-size:clamp(13px,1.8vh,19px)}
+    .statusline svg{width:2.6vh;height:2.6vh}
+    .eyebrow{font-size:clamp(12px,1.7vh,17px)}
+    .card{grid-area:chart;display:flex;flex-direction:column;min-height:0;margin:0;align-self:stretch}
+    #chart{flex:1;min-height:0;height:auto}
+    .readout{min-height:16px;padding-bottom:2px}
+    .stats{grid-area:stats;grid-template-columns:repeat(8,1fr);margin:2.2vh 0 1.4vh}
+    .stat{padding:1.5vh 1vw}
+    .stat .lab{font-size:clamp(10px,0.72vw,13px);margin-bottom:.8vh}
+    .stat .val{font-size:clamp(12px,1.05vw,24px)}
+    footer{grid-area:foot;padding:0 0 1.6vh}
+  }
 </style>
 </head>
 <body>
@@ -359,7 +391,10 @@ function drawChart(){
 
   var s=seriesFor(range),pts=s.pts;
   if(pts.length<2)return;
-  var padL=8,padR=64,padT=16,padB=26;
+  /* scale axis type and line weight with chart size so a TV reads from a distance */
+  var fs=Math.max(11,Math.round(h/26));
+  var lw=Math.max(1.8,h/230);
+  var padL=8,padR=Math.round(fs*4.6+14),padT=16,padB=Math.round(fs*2+8);
   var iw=w-padL-padR,ih=h-padT-padB;
 
   var lo=Infinity,hi=-Infinity,i;
@@ -371,7 +406,7 @@ function drawChart(){
   var Y=function(v){return padT+(1-(v-lo)/span)*ih};
 
   /* grid + y labels */
-  cx.font="11px 'IBM Plex Mono',monospace";cx.textAlign="left";cx.textBaseline="middle";
+  cx.font=fs+"px 'IBM Plex Mono',monospace";cx.textAlign="left";cx.textBaseline="middle";
   var step=niceStep(span/4);
   for(var gv=Math.ceil(lo/step)*step;gv<hi;gv+=step){
     var gy=Y(gv);
@@ -381,10 +416,10 @@ function drawChart(){
   }
   /* x labels */
   cx.fillStyle="#3A434E";cx.textAlign="center";cx.textBaseline="top";
-  var nLab=Math.min(6,Math.floor(iw/110)+2);
+  var nLab=Math.min(6,Math.floor(iw/(fs*10))+2);
   for(i=0;i<nLab;i++){
     var idx=Math.round(i*(pts.length-1)/(nLab-1));
-    cx.fillText(xLabel(pts[idx][0]),Math.max(padL+26,Math.min(X(idx),w-padR-26)),h-padB+8);
+    cx.fillText(xLabel(pts[idx][0]),Math.max(padL+fs*2.4,Math.min(X(idx),w-padR-fs*2.4)),h-padB+8);
   }
 
   var ref=s.ref!=null?s.ref:pts[0][1];
@@ -407,17 +442,17 @@ function drawChart(){
   cx.fillStyle=fg;cx.fill();
 
   /* line with glow */
-  cx.shadowColor=col;cx.shadowBlur=12;
-  cx.strokeStyle=col;cx.lineWidth=1.8;cx.lineJoin="round";
+  cx.shadowColor=col;cx.shadowBlur=lw*7;
+  cx.strokeStyle=col;cx.lineWidth=lw;cx.lineJoin="round";
   cx.beginPath();cx.moveTo(X(0),Y(pts[0][1]));
   for(i=1;i<pts.length;i++)cx.lineTo(X(i),Y(pts[i][1]));
   cx.stroke();cx.shadowBlur=0;
 
   /* endpoint */
   cx.fillStyle=col;
-  cx.beginPath();cx.arc(X(pts.length-1),Y(lastV),3.4,0,6.28);cx.fill();
+  cx.beginPath();cx.arc(X(pts.length-1),Y(lastV),lw*1.9,0,6.28);cx.fill();
   cx.globalAlpha=.25;
-  cx.beginPath();cx.arc(X(pts.length-1),Y(lastV),9,0,6.28);cx.fill();
+  cx.beginPath();cx.arc(X(pts.length-1),Y(lastV),lw*5,0,6.28);cx.fill();
   cx.globalAlpha=1;
 
   /* crosshair */
@@ -449,15 +484,27 @@ function xLabel(ts){
   if(range==="5D")return d.toLocaleDateString("en-US",{weekday:"short"});
   return d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
 }
-cv.addEventListener("pointermove",function(e){hover=e.offsetX;drawChart()});
+cv.addEventListener("pointermove",function(e){hover=e.offsetX;lastManual=Date.now();drawChart()});
 cv.addEventListener("pointerleave",function(){hover=null;drawChart()});
-document.querySelectorAll(".ranges button").forEach(function(b){
-  b.addEventListener("click",function(){
-    document.querySelectorAll(".ranges button").forEach(function(x){x.classList.remove("on")});
-    b.classList.add("on");range=b.dataset.r;hover=null;drawChart();
+var lastManual=0;
+function setRange(r){
+  range=r;hover=null;
+  document.querySelectorAll(".ranges button").forEach(function(x){
+    x.classList[x.dataset.r===r?"add":"remove"]("on");
   });
+  drawChart();
+}
+document.querySelectorAll(".ranges button").forEach(function(b){
+  b.addEventListener("click",function(){lastManual=Date.now();setRange(b.dataset.r)});
 });
 addEventListener("resize",drawChart);
+
+/* TV mode: cycle ranges on a mouseless screen; back off for 10 min after any interaction */
+var RANGES=["1D","5D","1M","ALL"];
+setInterval(function(){
+  if(Date.now()-lastManual<600000||hover!=null||!D)return;
+  setRange(RANGES[(RANGES.indexOf(range)+1)%RANGES.length]);
+},20000);
 
 load();
 setInterval(load,60000);
